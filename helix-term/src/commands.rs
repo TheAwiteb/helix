@@ -289,6 +289,12 @@ impl MappableCommand {
         }
     }
 
+    pub fn set_des(&mut self, new_des: String) {
+        if let Self::Typable { doc, .. } = self {
+            *doc = new_des;
+        }
+    }
+
     pub fn doc(&self) -> &str {
         match &self {
             Self::Typable { doc, .. } => doc,
