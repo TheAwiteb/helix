@@ -54,7 +54,7 @@ impl menu::Item for CompletionItem {
                 Some(lsp::CompletionItemKind::FIELD) => "field".into(),
                 Some(lsp::CompletionItemKind::VARIABLE) => "variable".into(),
                 Some(lsp::CompletionItemKind::CLASS) => "class".into(),
-                Some(lsp::CompletionItemKind::INTERFACE) => "interface".into(),
+                Some(lsp::CompletionItemKind::INTERFACE) => "trait".into(),
                 Some(lsp::CompletionItemKind::MODULE) => "module".into(),
                 Some(lsp::CompletionItemKind::PROPERTY) => "property".into(),
                 Some(lsp::CompletionItemKind::UNIT) => "unit".into(),

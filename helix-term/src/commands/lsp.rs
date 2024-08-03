@@ -176,7 +176,7 @@ fn display_symbol_kind(kind: lsp::SymbolKind) -> &'static str {
         lsp::SymbolKind::FIELD => "field",
         lsp::SymbolKind::CONSTRUCTOR => "construct",
         lsp::SymbolKind::ENUM => "enum",
-        lsp::SymbolKind::INTERFACE => "interface",
+        lsp::SymbolKind::INTERFACE => "trait",
         lsp::SymbolKind::FUNCTION => "function",
         lsp::SymbolKind::VARIABLE => "variable",
         lsp::SymbolKind::CONSTANT => "constant",
