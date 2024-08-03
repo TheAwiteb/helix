@@ -59,7 +59,7 @@ impl menu::Item for CompletionItem {
                 Some(lsp::CompletionItemKind::FIELD) => "field",
                 Some(lsp::CompletionItemKind::VARIABLE) => "variable",
                 Some(lsp::CompletionItemKind::CLASS) => "class",
-                Some(lsp::CompletionItemKind::INTERFACE) => "interface",
+                Some(lsp::CompletionItemKind::INTERFACE) => "trait",
                 Some(lsp::CompletionItemKind::MODULE) => "module",
                 Some(lsp::CompletionItemKind::PROPERTY) => "property",
                 Some(lsp::CompletionItemKind::UNIT) => "unit",
