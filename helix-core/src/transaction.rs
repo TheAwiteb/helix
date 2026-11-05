@@ -1246,4 +1246,40 @@ mod test {
         assert_eq!(result, "abc");
         assert_eq!(transaction.selection().unwrap(), &Selection::point(0));
     }
+
+    fn change_by_selection_ignore_overlapping_primary() {
+        // The range before the primary overlaps the first change and is dropped: the primary
+        // index must count the kept ranges.
+        let doc = Rope::from("0123456789abc");
+        for (ranges, primary) in [
+            (
+                crate::smallvec![Range::new(0, 1), Range::new(2, 3), Range::new(4, 5)],
+                2,
+            ),
+            (
+                crate::smallvec![
+                    Range::new(0, 1),
+                    Range::new(2, 3),
+                    Range::new(4, 5),
+                    Range::new(6, 7)
+                ],
+                2,
+            ),
+        ] {
+            let selection = Selection::new(ranges, primary);
+            let (_, new_selection) = Transaction::change_by_selection_ignore_overlapping(
+                &doc,
+                &selection,
+                |range| {
+                    if range.from() == 0 {
+                        (0, 3)
+                    } else {
+                        (range.from(), range.to())
+                    }
+                },
+                |_, _| None,
+            );
+            assert_eq!(new_selection.primary(), selection.primary());
+        }
+    }
 }
