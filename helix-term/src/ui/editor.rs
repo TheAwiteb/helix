@@ -96,7 +96,7 @@ impl EditorView {
         let text_annotations = view.text_annotations(doc, Some(theme));
         let mut decorations = DecorationManager::default();
 
-        if config.breadcrumb.enable {
+        if config.breadcrumb.enable && doc.path().is_some() {
             Self::render_breadcrumb(editor, doc, view, area.with_height(1), surface);
         }
 
@@ -754,7 +754,7 @@ impl EditorView {
 
         let mut x = viewport.x.saturating_add(1);
 
-        let separator = " > ";
+        let separator = ">";
         let separator_style = editor.theme.get("ui.breadcrumb.separator");
         let mut draw_separator = false;
 
@@ -794,9 +794,6 @@ impl EditorView {
 
                     x = draw_element(surface, viewport, x, &segment, style);
                 }
-            } else {
-                // Handle `[scratch]`
-                x = draw_element(surface, viewport, x, SCRATCH_BUFFER_NAME, style);
             }
         }
 
