@@ -1648,8 +1648,8 @@ impl Indicator {
     #[inline]
     #[must_use]
     pub fn modified(&self) -> Icon {
-        // TODO: ●?
-        self.modified.unwrap_or_else(|| icon!("[+]"))
+        self.modified
+            .unwrap_or_else(|| icon!(glyph: "●", padding: [1, 1]))
     }
 
     #[inline]

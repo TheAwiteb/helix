@@ -23,6 +23,7 @@ use helix_core::{
     visual_offset_from_block, Change, Position, Range, Selection, Transaction,
 };
 use helix_lsp::lsp::SymbolKind;
+use helix_stdx::stack_format;
 use helix_view::{
     annotations::diagnostics::DiagnosticFilter,
     document::{Mode, SCRATCH_BUFFER_NAME},
@@ -807,7 +808,8 @@ impl EditorView {
         }
 
         let config = editor.config();
-
+        let theme = editor.theme.as_ref();
+        let icons = ICONS.load();
         let style = editor
             .theme
             .try_get_exact("ui.breadcrumb")
@@ -849,6 +851,33 @@ impl EditorView {
                     let segment = component.as_os_str().to_string_lossy();
                     let is_directory = components.peek().is_some();
 
+                    if !is_directory {
+                        if let Some(icon) = icons
+                            .fs()
+                            .file()
+                            .and_then(|files| files.get(segment.as_ref()))
+                        {
+                            let style = theme
+                                .try_get_exact(format!("icons.file.{segment}").as_str())
+                                .or_else(|| {
+                                    path.extension().map(|ext| ext.display()).and_then(|ext| {
+                                        theme.try_get_exact(
+                                            stack_format!("icons.file.{ext}").as_str(),
+                                        )
+                                    })
+                                })
+                                .unwrap_or_else(|| icon.style());
+
+                            x = draw_element(
+                                surface,
+                                viewport,
+                                x,
+                                icon.with_padding(0, 2).glyph().as_str(),
+                                style,
+                            );
+                        }
+                    }
+
                     let style = if is_directory {
                         editor.theme.get("ui.text.directory")
                     } else {
@@ -869,7 +898,7 @@ impl EditorView {
                     draw_separator = true;
                 }
 
-                let style = match symbol.kind {
+                let symbol_style = match symbol.kind {
                     SymbolKind::MODULE
                     | SymbolKind::NAMESPACE
                     | SymbolKind::PACKAGE => editor.theme.get("namespace"),
@@ -902,7 +931,21 @@ impl EditorView {
                     _ => style,
                 };
 
-                x = draw_element(surface, viewport, x, symbol.name.as_ref(), style);
+                let kind = symbol.kind.as_str();
+                let icon_style = editor
+                    .theme
+                    .try_get_exact(stack_format!("icons.kind.{kind}").as_str())
+                    .unwrap_or(symbol_style);
+                if let Some(icon) = icons.kind().get(kind) {
+                    x = draw_element(
+                        surface,
+                        viewport,
+                        x,
+                        icon.with_padding(0, 2).glyph().as_str(),
+                        icon_style,
+                    );
+                }
+                x = draw_element(surface, viewport, x, symbol.name.as_ref(), symbol_style);
             }
         }
     }
