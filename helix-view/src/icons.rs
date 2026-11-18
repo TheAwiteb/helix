@@ -202,6 +202,16 @@ impl Icon {
 
     #[inline]
     #[must_use]
+    pub fn with_padding_left(mut self, left: u8) -> Self {
+        self.padding = Some(Padding {
+            left,
+            right: self.padding.map(|p| p.right).unwrap_or_default(),
+        });
+        self
+    }
+
+    #[inline]
+    #[must_use]
     pub const fn with_no_padding(self) -> Self {
         self.with_padding(0, 0)
     }

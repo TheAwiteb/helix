@@ -735,7 +735,7 @@ impl EditorView {
                         .set_stringn(
                             x,
                             viewport.y,
-                            &icon.glyph(),
+                            &icon.with_padding_left(0).glyph(),
                             remaining as usize,
                             icon.style(),
                         )
@@ -747,36 +747,35 @@ impl EditorView {
                 }
             }
 
+            // If it is modified, add the indicator, otherwise empty string
+            let modified = icons.ui().indicator().modified().with_no_padding().glyph();
+            let modification_indicator = if doc.is_modified() {
+                modified.as_str()
+            } else {
+                " "
+            };
+
             // PERF:
             // Rather than using `format!{"{name} "}`, we can save an allocation.
-            for element in [name, " "] {
+            for (idx, element) in [name, modification_indicator, "  "].iter().enumerate() {
                 let used = viewport.x.saturating_sub(x);
                 let remaining = surface.area.width.saturating_sub(used);
 
+                // Style for the modification indicator
+                let style = if idx == 1 {
+                    theme
+                        .try_get_exact("ui.statusline.file-modification-indicator")
+                        .unwrap_or(base)
+                } else {
+                    base
+                };
+
                 x = surface
-                    .set_stringn(x, viewport.y, element, remaining as usize, base)
+                    .set_stringn(x, viewport.y, element, remaining as usize, style)
                     .0;
 
                 if x >= surface.area.right() {
                     break;
-                }
-            }
-
-            if doc.is_modified() {
-                let modified = icons.ui().indicator().modified();
-                // PERF:
-                // Rather than using `format!{"{name} "}`, we can save an allocation.
-                for element in [modified.glyph().as_str(), " "] {
-                    let used = viewport.x.saturating_sub(x);
-                    let remaining = surface.area.width.saturating_sub(used);
-
-                    x = surface
-                        .set_stringn(x, viewport.y, element, remaining as usize, base)
-                        .0;
-
-                    if x >= surface.area.right() {
-                        break;
-                    }
                 }
             }
         }
