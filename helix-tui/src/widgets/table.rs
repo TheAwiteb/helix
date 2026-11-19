@@ -31,7 +31,7 @@ use helix_view::graphics::{Rect, Style};
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Cell<'a> {
     pub content: Text<'a>,
-    style: Style,
+    pub style: Style,
 }
 
 impl Cell<'_> {

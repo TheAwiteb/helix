@@ -356,11 +356,21 @@ impl<T: Item + 'static> Component for Menu<T> {
 
         let win_height = area.height as usize;
 
-        let rows = options
-            .iter()
-            .map(|option| option.format(&self.editor_data));
+        // Take the cell modifiers and fg color, but preserve the existing bg color
+        let rows = options.iter().map(|option| {
+            let mut row = option.format(&self.editor_data);
+            for cell in &mut row.cells {
+                let mut style = style;
+                if let Some(fg) = cell.style.fg {
+                    style = style.fg(fg);
+                };
+                style = style.add_modifier(cell.style.add_modifier);
+                cell.set_style(style);
+            }
+            row
+        });
+
         let table = Table::new(rows)
-            .style(style)
             .highlight_style(selected)
             .column_spacing(1)
             .widths(&self.widths);

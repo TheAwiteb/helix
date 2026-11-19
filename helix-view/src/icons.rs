@@ -134,7 +134,7 @@ macro_rules! icons {
 #[derive(Debug, Default, Eq, Clone, Copy)]
 pub struct Icon {
     glyph: Option<StackString>,
-    style: Option<Style>,
+    pub style: Option<Style>,
     padding: Option<Padding>,
     is_user_overridden: bool,
 }

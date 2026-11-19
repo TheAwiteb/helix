@@ -19,7 +19,7 @@ able to parse any URI, such as `urn:isbn:0451450523`.
 
 use bitflags::bitflags;
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
 
 pub use helix_stdx::Url;
 use serde::{de, de::Error as Error_, Deserialize, Serialize};
@@ -1273,6 +1273,43 @@ impl SymbolKind {
 }
 }
 
+impl FromStr for SymbolKind {
+    type Err = ();
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "file" => Ok(Self::FILE),
+            "module" => Ok(Self::MODULE),
+            "namespace" => Ok(Self::NAMESPACE),
+            "package" => Ok(Self::PACKAGE),
+            "class" => Ok(Self::CLASS),
+            "method" => Ok(Self::METHOD),
+            "property" => Ok(Self::PROPERTY),
+            "field" => Ok(Self::FIELD),
+            "construct" => Ok(Self::CONSTRUCTOR),
+            "enum" => Ok(Self::ENUM),
+            "interface" => Ok(Self::INTERFACE),
+            "function" => Ok(Self::FUNCTION),
+            "variable" => Ok(Self::VARIABLE),
+            "constant" => Ok(Self::CONSTANT),
+            "string" => Ok(Self::STRING),
+            "number" => Ok(Self::NUMBER),
+            "boolean" => Ok(Self::BOOLEAN),
+            "array" => Ok(Self::ARRAY),
+            "object" => Ok(Self::OBJECT),
+            "key" => Ok(Self::KEY),
+            "null" => Ok(Self::NULL),
+            "enum_member" => Ok(Self::ENUM_MEMBER),
+            "struct" => Ok(Self::STRUCT),
+            "event" => Ok(Self::EVENT),
+            "operator" => Ok(Self::OPERATOR),
+            "type_param" => Ok(Self::TYPE_PARAMETER),
+            _ => Err(()),
+        }
+    }
+}
+
 impl SymbolKind {
     pub fn all() -> Vec<Self> {
         (1..=26).map(Self).collect()
@@ -1311,6 +1348,32 @@ impl SymbolKind {
             Self::OPERATOR => "operator",
             Self::TYPE_PARAMETER => "type_param",
             _ => "",
+        }
+    }
+
+    /// Maps this symbol kind to a syntax-highlighting style name.
+    /// Returns `None` for kinds without a canonical style (e.g. `FILE`).
+    #[inline]
+    pub const fn style_name(&self) -> Option<&'static str> {
+        match *self {
+            Self::MODULE | Self::NAMESPACE | Self::PACKAGE => Some("namespace"),
+            Self::OBJECT | Self::STRUCT | Self::INTERFACE | Self::CLASS => Some("type"),
+            Self::METHOD => Some("function.method"),
+            Self::FUNCTION => Some("function"),
+            Self::ENUM => Some("type.enum"),
+            Self::ENUM_MEMBER => Some("type.enum.variant"),
+            Self::FIELD | Self::PROPERTY => Some("variable.other.member"),
+            Self::VARIABLE => Some("variable"),
+            Self::CONSTANT => Some("constant"),
+            Self::CONSTRUCTOR => Some("constructor"),
+            Self::STRING => Some("string"),
+            Self::NUMBER => Some("constant.numeric"),
+            Self::BOOLEAN => Some("constant.builtin.boolean"),
+            Self::ARRAY => Some("punctuation.bracket"),
+            Self::KEY => Some("label"),
+            Self::NULL => Some("constant.builtin"),
+            Self::TYPE_PARAMETER => Some("type.parameter"),
+            _ => None,
         }
     }
 }

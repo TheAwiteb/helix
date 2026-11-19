@@ -8,6 +8,7 @@ use crate::{
 };
 use helix_core::snippets::{ActiveSnippet, RenderedSnippet, Snippet};
 use helix_core::{self as core, chars, fuzzy::MATCHER, Change, Transaction};
+use helix_lsp::lsp::SymbolKind;
 use helix_lsp::{lsp, util, OffsetEncoding};
 use helix_stdx::stack_format;
 use helix_view::icons::ICONS;
@@ -26,6 +27,7 @@ use nucleo::{
 use tui::{buffer::Buffer as Surface, text::Span};
 
 use std::cmp::Reverse;
+use std::str::FromStr;
 use std::sync::Arc;
 
 impl menu::Item for CompletionItem {
@@ -90,27 +92,32 @@ impl menu::Item for CompletionItem {
         let name = &kind.content;
         let is_folder = kind.content == "folder";
 
-        let label = Span::styled(
-            label,
-            if deprecated {
-                Style::default().add_modifier(Modifier::CROSSED_OUT)
-            } else if is_folder {
-                theme.get("ui.text.directory")
-            } else {
-                Style::default()
-            },
-        );
+        let label_style = if deprecated {
+            Style::default()
+                .fg(theme
+                    .try_get_exact("warning")
+                    .unwrap_or_default()
+                    .fg
+                    .unwrap_or(Color::Yellow))
+                .add_modifier(Modifier::CROSSED_OUT)
+        } else if is_folder {
+            theme.get("ui.text.directory")
+        } else {
+            Style::default()
+        };
+        let symbol_style = SymbolKind::from_str(name)
+            .ok()
+            .as_ref()
+            .and_then(SymbolKind::style_name)
+            .and_then(|style_name| theme.try_get(style_name))
+            .unwrap_or_else(Style::default);
 
-        if let Some(color) = color {
-            menu::Row::new([
-                menu::Cell::from(Span::styled(icons.kind().color().to_string(), color)),
-                menu::Cell::from(label),
-                menu::Cell::from(kind),
-            ])
-        } else if let Some(icon) = icons.kind().get(name) {
+        // fall back to the LSP color when the icon has no themed color
+        if let Some(icon) = icons.kind().get(name) {
             let style = theme
                 .try_get_exact(&stack_format!("icons.kind.{name}"))
-                .unwrap_or_else(|| icon.style());
+                .or(icon.style)
+                .unwrap_or(symbol_style);
 
             menu::Row::new([
                 // NOTE:
@@ -119,12 +126,21 @@ impl menu::Item for CompletionItem {
                 // correctly, we pad the right still, leaving a space between the icon
                 // and the contents; Some terminals render an icon a different width
                 // depending on if there is a space or not.
-                menu::Cell::from(Span::styled(icon.with_padding(0, 1).to_string(), style)),
-                menu::Cell::from(label),
-                menu::Cell::from(kind),
+                menu::Cell::from(icon.with_padding(0, 1).to_string()).style(style),
+                menu::Cell::from(label).style(label_style),
+                menu::Cell::from(kind.content).style(style),
+            ])
+        } else if let Some(color) = color {
+            menu::Row::new([
+                menu::Cell::from(icons.kind().color().to_string()).style(color.into()),
+                menu::Cell::from(label).style(label_style),
+                menu::Cell::from(kind).style(symbol_style),
             ])
         } else {
-            menu::Row::new([menu::Cell::from(label), menu::Cell::from(kind)])
+            menu::Row::new([
+                menu::Cell::from(label).style(label_style),
+                menu::Cell::from(kind).style(symbol_style),
+            ])
         }
     }
 }

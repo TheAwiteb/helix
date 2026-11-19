@@ -897,38 +897,11 @@ impl EditorView {
                     draw_separator = true;
                 }
 
-                let symbol_style = match symbol.kind {
-                    SymbolKind::MODULE
-                    | SymbolKind::NAMESPACE
-                    | SymbolKind::PACKAGE => editor.theme.get("namespace"),
-
-                    SymbolKind::OBJECT // impl Block
-                    | SymbolKind::STRUCT
-                    | SymbolKind::INTERFACE
-                    | SymbolKind::CLASS => editor.theme.get("type"),
-
-                    SymbolKind::METHOD => editor.theme.get("function.method"),
-                    SymbolKind::FUNCTION => editor.theme.get("function"),
-
-                    SymbolKind::ENUM => editor.theme.get("type.enum"),
-                    SymbolKind::ENUM_MEMBER => editor.theme.get("type.enum.variant"),
-
-                   SymbolKind::FIELD | SymbolKind::PROPERTY => {
-                        editor.theme.get("variable.other.member")
-                    }
-
-                    SymbolKind::VARIABLE => editor.theme.get("variable"),
-                    SymbolKind::CONSTANT => editor.theme.get("constant"),
-                    SymbolKind::CONSTRUCTOR => editor.theme.get("constructor"),
-                    SymbolKind::STRING => editor.theme.get("string"),
-                    SymbolKind::NUMBER => editor.theme.get("constant.numeric"),
-                    SymbolKind::BOOLEAN => editor.theme.get("constant.builtin.boolean"),
-                    SymbolKind::ARRAY => editor.theme.get("punctuation.bracket"),
-                    SymbolKind::KEY => editor.theme.get("label"),
-                    SymbolKind::NULL => editor.theme.get("constant.builtin"),
-                    SymbolKind::TYPE_PARAMETER => editor.theme.get("type.parameter"),
-                    _ => style,
-                };
+                let symbol_style = symbol
+                    .kind
+                    .style_name()
+                    .and_then(|n| theme.try_get(n))
+                    .unwrap_or(style);
 
                 let kind = symbol.kind.as_str();
                 let icon_style = editor
