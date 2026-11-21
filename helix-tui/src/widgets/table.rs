@@ -389,7 +389,7 @@ impl Table<'_> {
         let mut rows_height = table_area.height;
 
         // Draw header
-        if let Some(ref header) = self.header {
+        if let Some(ref mut header) = self.header {
             let max_header_height = table_area.height.min(header.total_height());
             buf.set_style(
                 Rect {
@@ -404,7 +404,7 @@ impl Table<'_> {
             if has_selection {
                 col += (highlight_symbol.width() as u16).min(table_area.width);
             }
-            for (width, cell) in columns_widths.iter().zip(header.cells.iter()) {
+            for (width, cell) in columns_widths.iter().zip(header.cells.iter_mut()) {
                 render_cell(
                     buf,
                     cell,
@@ -464,7 +464,7 @@ impl Table<'_> {
                 }
             }
             let mut col = table_row_start_col;
-            for (width, cell) in columns_widths.iter().zip(table_row.cells.iter()) {
+            for (width, cell) in columns_widths.iter().zip(table_row.cells.iter_mut()) {
                 render_cell(
                     buf,
                     cell,
@@ -482,8 +482,13 @@ impl Table<'_> {
     }
 }
 
-fn render_cell(buf: &mut Buffer, cell: &Cell, area: Rect, truncate: bool) {
-    buf.set_style(area, cell.style);
+fn render_cell(buf: &mut Buffer, cell: &mut Cell, area: Rect, truncate: bool) {
+    // The cell width may exceed its content width, so only the content portion
+    // should receive the cell's style. Without this, modifiers like
+    // `CROSSED_OUT` would apply to the whole cell rather than just the content,
+    // which is incorrect for the deprecated style.
+    cell.content.patch_style(cell.style);
+
     for (i, spans) in cell.content.lines.iter().enumerate() {
         if i as u16 >= area.height {
             break;
