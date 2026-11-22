@@ -91,6 +91,29 @@ impl menu::Item for CompletionItem {
 
         let name = &kind.content;
         let is_folder = kind.content == "folder";
+        let is_file = kind.content == "file";
+
+        let get_file_icon = || {
+            is_file
+                .then(|| {
+                    icons
+                        .fs()
+                        .file()
+                        .map(|f| f.get_with_style_or_default(label, theme))
+                })
+                .flatten()
+        };
+
+        let get_folder_icon = || {
+            is_folder
+                .then(|| {
+                    icons
+                        .fs()
+                        .directory()
+                        .map(|d| d.get_with_style_or_default(label, false, theme, Style::default()))
+                })
+                .flatten()
+        };
 
         let label_style = if deprecated {
             Style::default()
@@ -105,6 +128,7 @@ impl menu::Item for CompletionItem {
         } else {
             Style::default()
         };
+
         let symbol_style = SymbolKind::from_str(name)
             .ok()
             .as_ref()
@@ -113,11 +137,21 @@ impl menu::Item for CompletionItem {
             .unwrap_or_else(Style::default);
 
         // fall back to the LSP color when the icon has no themed color
-        if let Some(icon) = icons.kind().get(name) {
-            let style = theme
+        if let Some(icon) = get_file_icon()
+            .or_else(get_folder_icon)
+            .or_else(|| icons.kind().get(name))
+        {
+            let icon_style = theme
                 .try_get_exact(&stack_format!("icons.kind.{name}"))
                 .or(icon.style)
                 .unwrap_or(symbol_style);
+
+            // No style for the kind if it is a file or a folder
+            let kind_style = if is_file || is_folder {
+                Style::default()
+            } else {
+                icon_style
+            };
 
             menu::Row::new([
                 // NOTE:
@@ -126,9 +160,9 @@ impl menu::Item for CompletionItem {
                 // correctly, we pad the right still, leaving a space between the icon
                 // and the contents; Some terminals render an icon a different width
                 // depending on if there is a space or not.
-                menu::Cell::from(icon.with_padding(0, 1).to_string()).style(style),
+                menu::Cell::from(icon.with_padding(0, 1).to_string()).style(icon_style),
                 menu::Cell::from(label).style(label_style),
-                menu::Cell::from(kind.content).style(style),
+                menu::Cell::from(kind.content).style(kind_style),
             ])
         } else if let Some(color) = color {
             menu::Row::new([
