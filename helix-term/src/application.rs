@@ -32,6 +32,7 @@ use crate::{
 use log::{debug, error, info, warn};
 use std::{
     io::{stdin, IsTerminal},
+    ops::Deref,
     path::Path,
     sync::Arc,
 };
@@ -383,9 +384,16 @@ impl Application {
             // Since only the Application can make changes to Editor's config,
             // the Editor must send up a new copy of a modified config so that
             // the Application can apply it.
-            ConfigEvent::Update(editor_config) => {
+            ConfigEvent::UpdateKey { pointer, value } => {
+                let mut editor_config = serde_json::json!(&self.editor.config().deref());
+                let editor_value = editor_config
+                    .pointer_mut(&pointer)
+                    .expect("event should not contains an invalid pointer");
+                *editor_value = value;
+
                 let mut app_config = (*self.config.load().clone()).clone();
-                app_config.editor = *editor_config;
+                app_config.editor = serde_json::from_value(editor_config)
+                    .expect("event should not contains an invalid value");
                 if let Err(err) = self.terminal.reconfigure((&app_config.editor).into()) {
                     self.editor.set_error(err.to_string());
                 };
