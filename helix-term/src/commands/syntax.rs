@@ -2,6 +2,7 @@ use std::{
     collections::HashSet,
     iter,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::Arc,
 };
 
@@ -13,16 +14,23 @@ use helix_core::{
     syntax::{Loader, QueryMatchIterEvent},
     Rope, RopeSlice, Selection, Syntax, Uri,
 };
+use helix_lsp::lsp::SymbolKind;
 use helix_stdx::{
     path,
     rope::{self, RopeSliceExt},
+    stack_format,
 };
 use helix_view::{
     align_view,
     document::{from_reader, SCRATCH_BUFFER_NAME},
-    Align, Document, DocumentId, Editor,
+    icons::ICONS,
+    Align, Document, DocumentId, Editor, Theme,
 };
 use ignore::{DirEntry, WalkBuilder, WalkState};
+use tui::{
+    text::{Span, Spans},
+    widgets::Cell,
+};
 
 use crate::{
     filter_picker_entry,
@@ -192,7 +200,31 @@ pub fn syntax_symbol_picker(cx: &mut Context) {
     let tags = tags_iter(syntax, &loader, text, UriOrDocumentId::Id(doc.id()), None);
 
     let columns = vec![
-        PickerColumn::new("kind", |tag: &Tag, _| tag.kind.as_str().into()),
+        PickerColumn::new("kind", |tag: &Tag, theme: &Arc<Theme>| {
+            let kind = tag.kind.as_str();
+            let mut spans: Vec<Span> = Vec::with_capacity(2);
+            let icons = ICONS.load();
+
+            let symbol_style = || {
+                SymbolKind::from_str(kind)
+                    .ok()
+                    .and_then(|k| k.style_name())
+                    .and_then(|n| theme.try_get(n))
+            };
+
+            if let Some(icon) = icons.kind().get(kind) {
+                let style = theme
+                    .try_get_exact(&stack_format!("icons.kind.{kind}"))
+                    .or_else(symbol_style)
+                    .unwrap_or_else(|| icon.style());
+                spans.push(Span::styled(icon.to_string(), style));
+                spans.push(Span::styled(kind, style))
+            } else {
+                spans.push(Span::raw(kind))
+            }
+
+            Cell::from(Spans::from(spans))
+        }),
         PickerColumn::new("name", |tag: &Tag, _| tag.name.as_str().into()),
     ];
 
@@ -200,7 +232,7 @@ pub fn syntax_symbol_picker(cx: &mut Context) {
         columns,
         1, // name
         tags,
-        (),
+        cx.editor.theme.clone(),
         move |cx, tag, action| {
             cx.editor.switch(doc_id, action);
             let view = view_mut!(cx.editor);
@@ -278,37 +310,67 @@ pub fn syntax_workspace_symbol_picker(cx: &mut Context) {
     let reg = cx.register.unwrap_or('/');
     cx.editor.registers.last_search_register = reg;
     let columns = vec![
-        PickerColumn::new("kind", |tag: &Tag, _| tag.kind.as_str().into()),
-        PickerColumn::new("name", |tag: &Tag, _| tag.name.as_str().into()).without_filtering(),
-        PickerColumn::new("path", |tag: &Tag, state: &SearchState| {
-            match &tag.doc {
-                UriOrDocumentId::Uri(uri) => {
-                    if let Some(path) = uri.as_path() {
-                        let path = if let Ok(stripped) = path.strip_prefix(&state.search_root) {
-                            stripped
-                        } else {
-                            path
-                        };
-                        path.to_string_lossy().into()
-                    } else {
-                        uri.to_string().into()
-                    }
+        PickerColumn::new(
+            "kind",
+            |tag: &Tag, (_, theme): &(SearchState, Arc<Theme>)| {
+                let kind = tag.kind.as_str();
+                let mut spans: Vec<Span> = Vec::with_capacity(2);
+                let icons = ICONS.load();
+
+                let symbol_style = || {
+                    SymbolKind::from_str(kind)
+                        .ok()
+                        .and_then(|k| k.style_name())
+                        .and_then(|n| theme.try_get(n))
+                };
+
+                if let Some(icon) = icons.kind().get(kind) {
+                    let style = theme
+                        .try_get_exact(&stack_format!("icons.kind.{kind}"))
+                        .or_else(symbol_style)
+                        .unwrap_or_else(|| icon.style());
+                    spans.push(Span::styled(icon.to_string(), style));
+                    spans.push(Span::styled(kind, style))
+                } else {
+                    spans.push(Span::raw(kind))
                 }
-                // This picker only uses `Id` for scratch buffers for better display.
-                UriOrDocumentId::Id(_) => SCRATCH_BUFFER_NAME.into(),
-            }
-        }),
+
+                Cell::from(Spans::from(spans))
+            },
+        ),
+        PickerColumn::new("name", |tag: &Tag, _| tag.name.as_str().into()).without_filtering(),
+        PickerColumn::new(
+            "path",
+            |tag: &Tag, (state, _): &(SearchState, Arc<Theme>)| {
+                match &tag.doc {
+                    UriOrDocumentId::Uri(uri) => {
+                        if let Some(path) = uri.as_path() {
+                            let path = if let Ok(stripped) = path.strip_prefix(&state.search_root) {
+                                stripped
+                            } else {
+                                path
+                            };
+                            path.to_string_lossy().into()
+                        } else {
+                            uri.to_string().into()
+                        }
+                    }
+                    // This picker only uses `Id` for scratch buffers for better display.
+                    UriOrDocumentId::Id(_) => SCRATCH_BUFFER_NAME.into(),
+                }
+            },
+        ),
     ];
 
     let get_tags = |query: &str,
                     editor: &mut Editor,
-                    state: Arc<SearchState>,
+                    data: Arc<(SearchState, Arc<Theme>)>,
                     injector: &Injector<_, _>| {
         if query.len() < 3 {
             return async { Ok(()) }.boxed();
         }
         // Attempt to find the tag in any open documents.
-        let pattern = match state.rope_regex_builder.build(query) {
+        let pattern = match data.0.rope_regex_builder.build(query) {
             Ok(pattern) => pattern,
             Err(err) => return async { Err(anyhow::anyhow!(err)) }.boxed(),
         };
@@ -326,11 +388,11 @@ pub fn syntax_workspace_symbol_picker(cx: &mut Context) {
                 }
             }
         }
-        if !state.search_root.exists() {
+        if !data.0.search_root.exists() {
             return async { Err(anyhow::anyhow!("Current working directory does not exist")) }
                 .boxed();
         }
-        let matcher = match state.regex_matcher_builder.build(query) {
+        let matcher = match data.0.regex_matcher_builder.build(query) {
             Ok(matcher) => {
                 // Clear any "Failed to compile regex" errors out of the statusline.
                 editor.clear_status();
@@ -355,15 +417,15 @@ pub fn syntax_workspace_symbol_picker(cx: &mut Context) {
             .collect();
 
         async move {
-            let searcher = state.searcher_builder.build();
-            state.walk_builder.build_parallel().run(|| {
+            let searcher = data.0.searcher_builder.build();
+            data.0.walk_builder.build_parallel().run(|| {
                 let mut searcher = searcher.clone();
                 let matcher = matcher.clone();
                 let injector = injector.clone();
                 let loader = loader.clone();
                 let documents = &documents;
                 let pattern = pattern.clone();
-                let syntax_cache = &state.syntax_cache;
+                let syntax_cache = &data.0.syntax_cache;
                 Box::new(move |entry: Result<DirEntry, ignore::Error>| -> WalkState {
                     let entry = match entry {
                         Ok(entry) => entry,
@@ -427,7 +489,7 @@ pub fn syntax_workspace_symbol_picker(cx: &mut Context) {
         columns,
         1, // name
         [],
-        state,
+        (state, cx.editor.theme.clone()),
         move |cx, tag, action| {
             let doc_id = match &tag.doc {
                 UriOrDocumentId::Id(id) => *id,
