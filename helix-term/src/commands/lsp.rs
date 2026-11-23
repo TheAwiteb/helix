@@ -3,7 +3,7 @@ use helix_lsp::{
     block_on,
     lsp::{
         self, CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionTriggerKind,
-        DiagnosticSeverity, NumberOrString,
+        DiagnosticSeverity, NumberOrString, SymbolKind,
     },
     util::{diagnostic_to_lsp_diagnostic, lsp_range_to_range, range_to_lsp_range},
     Client, LanguageServerId, OffsetEncoding,
@@ -42,6 +42,7 @@ use std::{
     fmt::Display,
     future::Future,
     path::Path,
+    str::FromStr,
     sync::Arc,
 };
 
@@ -401,22 +402,28 @@ pub fn symbol_picker(cx: &mut Context) {
                     "kind",
                     |item: &SymbolInformationItem, theme: &Arc<Theme>| {
                         let name = item.symbol.kind.as_str();
+                        let mut spans = Vec::new();
                         let icons = ICONS.load();
-
-                        let mut line = Vec::new();
+                        let symbol_style = || {
+                            SymbolKind::from_str(name)
+                                .ok()
+                                .and_then(|k| k.style_name())
+                                .and_then(|n| theme.try_get(n))
+                        };
 
                         if let Some(icon) = icons.kind().get(name) {
-                            line.push(Span::styled(
-                                icon.to_string(),
-                                theme
-                                    .try_get_exact(&stack_format!("icons.kind.{name}"))
-                                    .unwrap_or_else(|| icon.style()),
-                            ));
+                            let style = theme
+                                .try_get_exact(&stack_format!("icons.kind.{name}"))
+                                .or_else(symbol_style)
+                                .unwrap_or_else(|| icon.style());
+
+                            spans.push(Span::styled(icon.to_string(), style));
+                            spans.push(Span::styled(name, style));
+                        } else {
+                            spans.push(Span::raw(name))
                         }
 
-                        line.push(Span::raw(name));
-
-                        Cell::from(Spans::from(line))
+                        Cell::from(Spans::from(spans))
                     },
                 ),
                 // Some symbols in the document symbol picker may have a URI that isn't
@@ -429,7 +436,8 @@ pub fn symbol_picker(cx: &mut Context) {
                     item.symbol
                         .container_name
                         .as_deref()
-                        .unwrap_or_default()
+                        .filter(|container| !container.is_empty())
+                        .unwrap_or("N/A")
                         .into()
                 }),
             ];
@@ -568,22 +576,27 @@ pub fn workspace_symbol_picker(cx: &mut Context) {
             "kind",
             |item: &SymbolInformationItem, theme: &Arc<Theme>| {
                 let name = item.symbol.kind.as_str();
+                let mut spans = Vec::new();
                 let icons = ICONS.load();
-
-                let mut line = Vec::new();
+                let symbol_style = || {
+                    SymbolKind::from_str(name)
+                        .ok()
+                        .and_then(|k| k.style_name())
+                        .and_then(|n| theme.try_get(n))
+                };
 
                 if let Some(icon) = icons.kind().get(name) {
-                    line.push(Span::styled(
-                        icon.to_string(),
-                        theme
-                            .try_get_exact(&stack_format!("icons.kind.{name}"))
-                            .unwrap_or_else(|| icon.style()),
-                    ));
+                    let style = theme
+                        .try_get_exact(&stack_format!("icons.kind.{name}"))
+                        .or_else(symbol_style)
+                        .unwrap_or_else(|| icon.style());
+                    spans.push(Span::styled(icon.to_string(), style));
+                    spans.push(Span::styled(name, style));
+                } else {
+                    spans.push(Span::raw(name));
                 }
 
-                line.push(Span::raw(name));
-
-                Cell::from(Spans::from(line))
+                Cell::from(Spans::from(spans))
             },
         ),
         ui::PickerColumn::new("name", |item: &SymbolInformationItem, _| {
@@ -594,7 +607,8 @@ pub fn workspace_symbol_picker(cx: &mut Context) {
             item.symbol
                 .container_name
                 .as_deref()
-                .unwrap_or_default()
+                .filter(|container| !container.is_empty())
+                .unwrap_or("N/A")
                 .into()
         }),
         ui::PickerColumn::new("path", |item: &SymbolInformationItem, _| {
